@@ -1,3 +1,13 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { DailyCostCard } from './components/daily-cost-card'
+import { SpendingChart } from './components/spending-chart'
+import { ModelBreakdown } from './components/model-breakdown'
+import { SessionsTable } from './components/sessions-table'
+import { BudgetProgress } from './components/budget-progress'
+import { AddSessionModal } from './components/add-session-modal'
+import { DollarSign, BarChart3, List } from 'lucide-react'
 import { 
   getDailyCost, 
   getSpendingTrend, 
@@ -6,52 +16,71 @@ import {
   getMonthlyTotal,
   getSettings
 } from '@/lib/queries'
-import { DailyCostCard } from './components/daily-cost-card'
-import { SpendingChart } from './components/spending-chart'
-import { ModelBreakdown } from './components/model-breakdown'
-import { SessionsTable } from './components/sessions-table'
-import { BudgetProgress } from './components/budget-progress'
-import { AddSessionModal } from './components/add-session-modal'
-import { DollarSign, BarChart3, PieChart, List } from 'lucide-react'
 
-export const dynamic = 'force-dynamic'
+export default function DashboardPage() {
+  const [data, setData] = useState<{
+    todayCost: number
+    yesterdayCost: number
+    spendingTrend: Array<{ date: string; cost: number; displayDate: string }>
+    modelBreakdown: Array<{ model: string; cost: number; percentage: number }>
+    recentSessions: any[]
+    monthlyTotal: number
+    budget: number
+  }> | null>(null)
+  
+  const [loading, setLoading] = useState(true)
 
-async function getDashboardData() {
-  const today = new Date().toISOString().split('T')[0]
-  const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
-  
-  const [
-    todayCost,
-    yesterdayCost,
-    spendingTrend,
-    modelBreakdown,
-    recentSessions,
-    monthlyTotal,
-    settings
-  ] = await Promise.all([
-    getDailyCost(today),
-    getDailyCost(yesterday),
-    getSpendingTrend(7),
-    getModelBreakdown(30),
-    getRecentSessions(10),
-    getMonthlyTotal(),
-    getSettings()
-  ])
-  
-  return {
-    todayCost,
-    yesterdayCost,
-    spendingTrend,
-    modelBreakdown,
-    recentSessions,
-    monthlyTotal,
-    budget: settings?.monthly_budget || 100
+  const loadData = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split('T')[0]
+      const yesterday = new Date(Date.now() - 86400000).toISOString().split('T')[0]
+      
+      const [
+        todayCost,
+        yesterdayCost,
+        spendingTrend,
+        modelBreakdown,
+        recentSessions,
+        monthlyTotal,
+        settings
+      ] = await Promise.all([
+        getDailyCost(today),
+        getDailyCost(yesterday),
+        getSpendingTrend(7),
+        getModelBreakdown(30),
+        getRecentSessions(10),
+        getMonthlyTotal(),
+        getSettings()
+      ])
+      
+      setData({
+        todayCost,
+        yesterdayCost,
+        spendingTrend,
+        modelBreakdown,
+        recentSessions,
+        monthlyTotal,
+        budget: settings?.monthly_budget || 100
+      })
+    } catch (error) {
+      console.error('Failed to load data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    loadData()
+  }, [loadData])
+
+  if (loading || !data) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-cyan-400 text-xl">Loading...</div>
+      </div>
+    )
   }
-}
 
-export default async function DashboardPage() {
-  const data = await getDashboardData()
-  
   return (
     <div className="min-h-screen bg-slate-950">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -64,7 +93,7 @@ export default async function DashboardPage() {
             </h1>
             <p className="text-slate-400 mt-1">Track and visualize your AI spending</p>
           </div>
-          <AddSessionModal onSessionAdded={() => {}} />
+          <AddSessionModal onSessionAdded={loadData} />
         </div>
         
         {/* Stats Grid */}
